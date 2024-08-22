@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jul 17 10:42:35 2024
+Created on Wed Jul 17 2024
 
-@author: Alberto y Claude IA
+@author: Alberto Lencina, Luisa Cabezas y Claude IA
+
+Contacto: alencina@azul.faa.unicen.edu.ar
 
 Objetivo: 
 Identificar las manchas de enfermedades fúngicas en hojas de cebada que fueron cortadas de la planta, pegadas sobre un papel blanco y fotografiadas.
@@ -26,10 +28,23 @@ Algoritmo:
     3.a Mostrar la imagen resultante del paso 2.e.
     3.b Junto con la imagen incluir un deslizador que seleccione un umbral (Ui) para el índice (G-R)/(G+R) siendo G el valor del píxel en el canal verde de la imagen y R en el rojo.
     3.c Los píxeles de la imagen cuyo valor de (G-R)/(G+R) sea mayor que Ui (enfermos) se mostrarán dinámicamente en una capa roja superpuesta sobre la imagen mostrada en el paso 2.a, mientras que aquellos valores menores o iguales que Ui (samos) se mostrarán dinámicamente en una capa verde. Todo esto a medida que se modifica el valor en el deslizador.
-    3.d Dinámicamente, en el borde superior izquierdo de la imágen se muestra el calor de la severidad, que se calcula como el cociente entre el recuento de píxeles enfermos respecto del total de píxeles distintos de NaN de la imagen mostrada en el paso 3.a.
+    3.d Dinámicamente, en el borde superior izquierdo de la imágen se muestra el valor de la severidad, que se calcula como el cociente entre el recuento de píxeles enfermos respecto del total de píxeles distintos de NaN de la imagen mostrada en el paso 3.a.
     3.e Debajo del deslizador incluir un botón que diga “Ok” para finalizar la segmentación de la muestra, una vez que el usuario esté conforme con el valor Ui seleccionado.
 
 4 Imprimir en pantalla en nombre del archivo de la imagen seleccionada en el paso 1 y el valor de severidad calculada en el paso 3.d.
+
+
+Changelog:
+2024-08-22: Se colocaron los valores iniciales del modelo entrenado->Paremeters.xlsx
+            Se comentaron los siguientes pasos en def mostrar_imagen(self, img, canvas):
+                # Sugerir umbrales iniciales
+                # Establecer y actualizar umbral B
+                # Actualizar el valor del Umbral Indice antes de desactivarlo
+                # Asegurarse de que el Umbral Indice esté desactivado
+                Se tradujo al inglés el texto visible
+
+            
+
 
 """
 import cv2
@@ -42,15 +57,15 @@ from sklearn.cluster import MiniBatchKMeans
 class AnalisisEnfermedadCebada:
     def __init__(self, master):
         self.master = master
-        self.master.title("Análisis de Enfermedad en Cebada")
+        self.master.title("Leaf Severity Calculator")
         self.master.state('zoomed')  # Maximizar la ventana
         
         self.img = None
         self.img_original = None
         self.mascara_hojas = None
         self.nombre_archivo = ""
-        self.ui_inicial = 0.0
-        self.ub_inicial = 200
+        self.ui_inicial = -0.030792934
+        self.ub_inicial = 180
         
         # Frame principal
         main_frame = tk.Frame(master)
@@ -60,10 +75,10 @@ class AnalisisEnfermedadCebada:
         self.frame_superior = tk.Frame(main_frame)
         self.frame_superior.pack(fill=tk.X, pady=(0, 10))
         
-        self.btn_cargar = tk.Button(self.frame_superior, text="Cargar Imagen", command=self.cargar_imagen)
+        self.btn_cargar = tk.Button(self.frame_superior, text="Load Image", command=self.cargar_imagen)
         self.btn_cargar.pack(side=tk.LEFT, padx=(0, 1020))
         
-        self.lbl_severidad = tk.Label(self.frame_superior, text="Severidad: ", font=("Arial", 16, "bold"))
+        self.lbl_severidad = tk.Label(self.frame_superior, text="Severity: ", font=("Arial", 16, "bold"))
         self.lbl_severidad.pack(side=tk.LEFT)
         
         # Frame de imágenes
@@ -84,8 +99,8 @@ class AnalisisEnfermedadCebada:
         self.frame_controles = tk.Frame(main_frame)
         self.frame_controles.pack(fill=tk.X, pady=(10, 0))
         
-        self.crear_control_deslizador("Umbral B", 0, 255, self.actualizar_umbral_b, resolution=1, valor_inicial=self.ub_inicial)
-        self.crear_control_deslizador("Umbral Indice", -1, 1, self.actualizar_umbral_indice, resolution=0.001, valor_inicial=self.ui_inicial)
+        self.crear_control_deslizador("Background", 0, 255, self.actualizar_umbral_b, resolution=1, valor_inicial=self.ub_inicial)
+        self.crear_control_deslizador("Disease", -1, 1, self.actualizar_umbral_indice, resolution=0.001, valor_inicial=self.ui_inicial)
         
         
     def crear_control_deslizador(self, label, from_, to, command, resolution=1, valor_inicial=None):
@@ -152,23 +167,23 @@ class AnalisisEnfermedadCebada:
             self.img = cv2.cvtColor(self.img_original, cv2.COLOR_BGR2RGB)
             
             # Sugerir umbrales iniciales
-            self.ub_inicial, self.ui_inicial = self.sugerir_umbrales(path)
+            #self.ub_inicial, self.ui_inicial = self.sugerir_umbrales(path)
             
             self.mostrar_imagen(self.img_original, self.canvas_original)
             
             # Establecer y actualizar umbral B
-            self.slider_umbral_b.set(self.ub_inicial)
-            self.actualizar_umbral_b(self.ub_inicial)
+            #self.slider_umbral_b.set(self.ub_inicial)
+            #self.actualizar_umbral_b(self.ub_inicial)
             
             # Actualizar el valor del Umbral Indice antes de desactivarlo
-            self.slider_umbral_indice.set(self.ui_inicial)
-            self.entry_umbral_indice.delete(0, tk.END)
-            self.entry_umbral_indice.insert(0, str(self.ui_inicial))
+            #self.slider_umbral_indice.set(self.ui_inicial)
+            #self.entry_umbral_indice.delete(0, tk.END)
+            #self.entry_umbral_indice.insert(0, str(self.ui_inicial))
             
             # Asegurarse de que el Umbral Indice esté desactivado
-            self.slider_umbral_indice.config(state='disabled')
-            self.entry_umbral_indice.config(state='disabled')
-            self.btn_umbral_indice.config(state='disabled')
+            #self.slider_umbral_indice.config(state='disabled')
+            #self.entry_umbral_indice.config(state='disabled')
+            #self.btn_umbral_indice.config(state='disabled')
             
     def mostrar_imagen(self, img, canvas):
         img = cv2.medianBlur(img, 5)
@@ -220,10 +235,10 @@ class AnalisisEnfermedadCebada:
             # No actualizar la máscara de hojas ni llamar a actualizar_umbral_i aquí
             
     def actualizar_umbral_indice(self, ui):
-        if self.mascara_hojas is not None and self.slider_umbral_indice['state'] == 'normal':
+        if self.mascara_hojas is not None and self.slider_disease['state'] == 'normal':
             ui = float(ui)
-            self.entry_umbral_indice.delete(0, tk.END)
-            self.entry_umbral_indice.insert(0, str(ui))
+            self.entry_disease.delete(0, tk.END)
+            self.entry_disease.insert(0, str(ui))
             b, g, r = cv2.split(self.img_original)
             indice = np.divide(g.astype(float) - r.astype(float), g.astype(float) + r.astype(float), out=np.zeros_like(g, dtype=float), where=(g+r)!=0)
             mascara_enferma = (indice <= ui) & self.mascara_hojas
@@ -234,15 +249,15 @@ class AnalisisEnfermedadCebada:
             img_resultado[mascara_sana] = [0, 255, 0]  # Verde para sano
             
             severidad = np.sum(mascara_enferma) / np.sum(self.mascara_hojas)
-            self.lbl_severidad.config(text=f"Severidad: {severidad:.2%}")
+            self.lbl_severidad.config(text=f"Severity: {severidad:.1%}")
             
             self.mostrar_imagen(img_resultado, self.canvas_procesada)
             self.severidad = severidad
             
     def finalizar_segmentacion(self, label):
-        if label == "Umbral B":
+        if label == "Background":
             if self.img is not None:
-                ub = self.slider_umbral_b.get()
+                ub = self.slider_background.get()
                 b, g, r = cv2.split(self.img_original)
                 self.mascara_hojas = b <= ub
                 img_segmentada = self.img_original.copy()
@@ -251,15 +266,15 @@ class AnalisisEnfermedadCebada:
                 self.mostrar_imagen(self.img, self.canvas_procesada)
                 
                 # Activar el control de Umbral Indice
-                self.slider_umbral_indice.config(state='normal')
-                self.entry_umbral_indice.config(state='normal')
-                self.btn_umbral_indice.config(state='normal')
+                self.slider_disease.config(state='normal')
+                self.entry_disease.config(state='normal')
+                self.btn_disease.config(state='normal')
                 
                 # Inicializar la visualización del Umbral Indice
                 self.actualizar_umbral_indice(self.ui_inicial)
-        elif label == "Umbral Indice":
-            print(f"Análisis finalizado para la imagen: {self.nombre_archivo}")
-            print(f"Severidad: {self.severidad:.2%}")
+        elif label == "Disease":
+            print(f"Analysis completed for image: {self.nombre_archivo}")
+            print(f"Severity: {self.severidad:.1%}")
             #self.master.destroy()
 
 
