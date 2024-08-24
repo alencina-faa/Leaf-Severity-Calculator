@@ -42,7 +42,7 @@ Changelog:
                 # Actualizar el valor del Umbral Indice antes de desactivarlo
                 # Asegurarse de que el Umbral Indice esté desactivado
                 Se tradujo al inglés el texto visible
-
+2024-08-23: Se eliminaron funciones y comentarios innecesarios.
             
 
 
@@ -85,10 +85,6 @@ class AnalisisEnfermedadCebada:
         self.frame_imagenes = tk.Frame(main_frame)
         self.frame_imagenes.pack(expand=True, fill=tk.BOTH, pady=10)
         
-        # Fijar el tamaño de los canvas una sola vez
-        canvas_width = self.master.winfo_width() // 2
-        canvas_height = int(self.master.winfo_height() * 0.7)
-        
         self.canvas_original = tk.Canvas(self.frame_imagenes, bg='lightgray')
         self.canvas_original.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
         
@@ -111,13 +107,14 @@ class AnalisisEnfermedadCebada:
         lbl.pack(side=tk.LEFT, padx=(0, 10))
     
         slider = tk.Scale(frame, from_=from_, to=to, resolution=resolution, orient=tk.HORIZONTAL, length=500, command=command)
-        if valor_inicial is not None:
-            slider.set(valor_inicial)
-            slider.pack(side=tk.LEFT, expand=True, fill=tk.X)
+        slider.set(valor_inicial)
+        slider.pack(side=tk.LEFT, expand=True, fill=tk.X)    
     
         entry = tk.Entry(frame, width=10)
         entry.pack(side=tk.LEFT, padx=(10, 0))
         entry.bind('<Return>', lambda e, s=slider: s.set(entry.get()))
+        entry.delete(0, tk.END)
+        entry.insert(0, str(valor_inicial))
     
         btn = tk.Button(frame, text="OK", command=lambda: self.finalizar_segmentacion(label))
         btn.pack(side=tk.LEFT, padx=(10, 0))
@@ -125,39 +122,7 @@ class AnalisisEnfermedadCebada:
         setattr(self, f"slider_{label.replace(' ', '_').lower()}", slider)
         setattr(self, f"entry_{label.replace(' ', '_').lower()}", entry)
         setattr(self, f"btn_{label.replace(' ', '_').lower()}", btn)
-    
-        # Actualizar el entry con el valor inicial
-        if valor_inicial is not None:
-            entry.delete(0, tk.END)
-            entry.insert(0, str(valor_inicial))
 
-    def sugerir_umbrales(self, imagen_path):
-        # Cargar la imagen
-        img = cv2.imread(imagen_path)
-        
-        # Separar canales (BGR en OpenCV)
-        b, g, r = cv2.split(img)
-        
-        # 1. Segmentación del fondo (umbral B)
-        ub, _ = cv2.threshold(b, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        
-        # 2. Segmentación de la muestra (umbral del índice NGRDI)
-        # Calcular NGRDI
-        ngrdi = np.divide(g.astype(float) - r.astype(float), g.astype(float) + r.astype(float), out=np.zeros_like(g, dtype=float), where=(g+r)!=0)
-        
-        # Crear máscara de hojas
-        mascara_hojas = b <= ub
-        
-        # Aplicar K-means solo a los píxeles de las hojas
-        ngrdi_hojas = ngrdi[mascara_hojas].reshape(-1, 1)
-        kmeans = MiniBatchKMeans(n_clusters=4, random_state=0, init="k-means++", n_init=100, max_iter=300).fit(ngrdi_hojas)
-        
-        # El umbral será el punto medio entre los dos centroides #menores
-        clu_cent = kmeans.cluster_centers_[:,0]
-        clu_cent.sort()
-        ui = np.mean(clu_cent[:2]) #np.mean(kmeans.cluster_centers_)
-        
-        return ub, ui
 
     def cargar_imagen(self):
         path = filedialog.askopenfilename()
@@ -166,24 +131,16 @@ class AnalisisEnfermedadCebada:
             self.img_original = cv2.imread(path)
             self.img = cv2.cvtColor(self.img_original, cv2.COLOR_BGR2RGB)
             
-            # Sugerir umbrales iniciales
-            #self.ub_inicial, self.ui_inicial = self.sugerir_umbrales(path)
-            
             self.mostrar_imagen(self.img_original, self.canvas_original)
+
+            self.slider_background.set(self.ub_inicial)
+            self.actualizar_umbral_b(self.ub_inicial)
+            self.finalizar_segmentacion("Background")
+
+            self.slider_disease.set(self.ui_inicial)
+            self.actualizar_umbral_indice(self.ui_inicial)
+            self.finalizar_segmentacion("Disease")
             
-            # Establecer y actualizar umbral B
-            #self.slider_umbral_b.set(self.ub_inicial)
-            #self.actualizar_umbral_b(self.ub_inicial)
-            
-            # Actualizar el valor del Umbral Indice antes de desactivarlo
-            #self.slider_umbral_indice.set(self.ui_inicial)
-            #self.entry_umbral_indice.delete(0, tk.END)
-            #self.entry_umbral_indice.insert(0, str(self.ui_inicial))
-            
-            # Asegurarse de que el Umbral Indice esté desactivado
-            #self.slider_umbral_indice.config(state='disabled')
-            #self.entry_umbral_indice.config(state='disabled')
-            #self.btn_umbral_indice.config(state='disabled')
             
     def mostrar_imagen(self, img, canvas):
         img = cv2.medianBlur(img, 5)
@@ -224,22 +181,21 @@ class AnalisisEnfermedadCebada:
     def actualizar_umbral_b(self, ub):
         if self.img is not None:
             ub = int(float(ub))
-            self.entry_umbral_b.delete(0, tk.END)
-            self.entry_umbral_b.insert(0, str(ub))
+            self.entry_background.delete(0, tk.END)
+            self.entry_background.insert(0, str(ub))
             b, _, _ = cv2.split(self.img_original)
             mascara = b > ub
             img_copia = self.img.copy()
             img_copia[mascara] = [255, 0, 0]  # Azul para visualización
             self.mostrar_imagen(img_copia, self.canvas_procesada)
             
-            # No actualizar la máscara de hojas ni llamar a actualizar_umbral_i aquí
             
     def actualizar_umbral_indice(self, ui):
-        if self.mascara_hojas is not None and self.slider_disease['state'] == 'normal':
+        if self.mascara_hojas is not None:
             ui = float(ui)
             self.entry_disease.delete(0, tk.END)
             self.entry_disease.insert(0, str(ui))
-            b, g, r = cv2.split(self.img_original)
+            _, g, r = cv2.split(self.img_original)
             indice = np.divide(g.astype(float) - r.astype(float), g.astype(float) + r.astype(float), out=np.zeros_like(g, dtype=float), where=(g+r)!=0)
             mascara_enferma = (indice <= ui) & self.mascara_hojas
             mascara_sana = (indice > ui) & self.mascara_hojas
@@ -265,17 +221,12 @@ class AnalisisEnfermedadCebada:
                 self.img = cv2.cvtColor(img_segmentada, cv2.COLOR_BGR2RGB)
                 self.mostrar_imagen(self.img, self.canvas_procesada)
                 
-                # Activar el control de Umbral Indice
-                self.slider_disease.config(state='normal')
-                self.entry_disease.config(state='normal')
-                self.btn_disease.config(state='normal')
-                
                 # Inicializar la visualización del Umbral Indice
                 self.actualizar_umbral_indice(self.ui_inicial)
+
         elif label == "Disease":
             print(f"Analysis completed for image: {self.nombre_archivo}")
             print(f"Severity: {self.severidad:.1%}")
-            #self.master.destroy()
 
 
 root = tk.Tk()
