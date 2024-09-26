@@ -9,7 +9,7 @@ class AnalisisEnfermedadCebada:
     def __init__(self):
         self.img = None
         self.img_original = None
-        self.mascara_hojas = np.ones((1, 1), dtype=bool)  # Inicializa como máscara de hojas válida
+        self.mascara_hojas = None  # Cambiado: inicializar como None
         self.nombre_archivo = ""
         self.ui_inicial = -0.030792934
         self.ub_inicial = 180
@@ -27,7 +27,7 @@ class AnalisisEnfermedadCebada:
         return ft.Column(
             controls=[
                 self.btn_cargar,
-                self.file_picker,  # Asegúrate de que el FilePicker esté aquí
+                self.file_picker,
                 self.slider_background,
                 self.slider_disease,
                 self.lbl_severidad,
@@ -37,7 +37,6 @@ class AnalisisEnfermedadCebada:
         )
 
     def cargar_imagen(self, e):
-        # Abre el FilePicker cuando se hace clic en el botón
         self.file_picker.pick_files(allow_multiple=False)
 
     def procesar_imagen(self, e: ft.FilePickerResultEvent):
@@ -49,12 +48,11 @@ class AnalisisEnfermedadCebada:
                 return
             self.img = cv2.cvtColor(self.img_original, cv2.COLOR_BGR2RGB)
 
-            # Mostrar imagen original
             self.mostrar_imagen(self.img_original, self.img_original_view)
 
-            # Inicializar sliders
             self.slider_background.value = self.ub_inicial
             self.actualizar_umbral_b(None)
+            self.finalizar_segmentacion("Background")  # Nuevo: llamar a finalizar_segmentacion
             self.actualizar_umbral_indice(None)
 
     def mostrar_imagen(self, img, image_view):
@@ -62,7 +60,7 @@ class AnalisisEnfermedadCebada:
         buffer = BytesIO()
         img_pil.save(buffer, format="PNG")
         img_data = buffer.getvalue()
-        image_view.src_base64 = base64.b64encode(img_data).decode("utf-8")  # Asigna src_base64
+        image_view.src_base64 = base64.b64encode(img_data).decode("utf-8")
         image_view.update()
 
     def actualizar_umbral_b(self, e):
@@ -91,3 +89,15 @@ class AnalisisEnfermedadCebada:
             self.lbl_severidad.update()
 
             self.mostrar_imagen(img_resultado, self.img_procesada_view)
+
+    # Nuevo método añadido
+    def finalizar_segmentacion(self, label):
+        if label == "Background":
+            if self.img is not None:
+                ub = self.slider_background.value
+                b, _, _ = cv2.split(self.img_original)
+                self.mascara_hojas = b <= ub
+                img_segmentada = self.img_original.copy()
+                img_segmentada[~self.mascara_hojas] = [0, 0, 0]
+                self.img = cv2.cvtColor(img_segmentada, cv2.COLOR_BGR2RGB)
+                self.mostrar_imagen(self.img, self.img_procesada_view)
