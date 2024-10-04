@@ -8,36 +8,49 @@ import cv2
 
 class AnalisisEnfermedadCebada(toga.App):
     def startup(self):
-        self.main_window = toga.MainWindow(title="Análisis de Enfermedad en Cebada", size=(600, 800))
+        self.main_window = toga.MainWindow(title="Análisis de Enfermedad en Cebada", size=(1000, 800))  # Aumenta el tamaño
         
+        # Botones
         self.cargar_imagen_button = toga.Button("Cargar Imagen", on_press=self.cargar_imagen)
         self.guardar_imagen_button = toga.Button("Guardar Imagen Procesada", on_press=self.guardar_imagen)
         
-        self.image_view = toga.ImageView(style=Pack(width=500, height=500))
+        # ImageViews para mostrar la imagen original y procesada
+        self.image_view_original = toga.ImageView(style=Pack(width=400, height=400))
+        self.image_view_procesada = toga.ImageView(style=Pack(width=400, height=400))
         
+        # Sliders y etiquetas para la segmentación y clasificación
         self.slider_umbral_b = toga.Slider(on_change=self.actualizar_umbral_b, min=0, max=255, value=180)
         self.label_umbral_b = toga.Label('Umbral B: 180', style=Pack(padding=(0, 5)))
         
-        # Reintroducir el slider para la clasificación
         self.slider_umbral_i = toga.Slider(on_change=self.actualizar_umbral_indice, min=-1, max=1, value=0)
         self.label_umbral_i = toga.Label('Umbral Índice: 0.000', style=Pack(padding=(0, 5)))
         
         self.label_severidad = toga.Label('Severidad: 0%', style=Pack(padding=(0, 5)))
+
+        # Layout
+        botones_box = toga.Box(
+            children=[self.cargar_imagen_button, self.guardar_imagen_button],
+            style=Pack(direction=ROW, padding=10)
+        )
         
-        self.mascara_hojas = None
-        self.nombre_archivo = ""
-        self.severidad = 0
-        self.imagen_procesada = None
-        
-        box = toga.Box(
-            children=[self.cargar_imagen_button, self.guardar_imagen_button, 
-                      self.slider_umbral_b, self.label_umbral_b, 
+        sliders_box = toga.Box(
+            children=[self.slider_umbral_b, self.label_umbral_b, 
                       self.slider_umbral_i, self.label_umbral_i,
-                      self.label_severidad, self.image_view],
+                      self.label_severidad],
+            style=Pack(direction=COLUMN, padding=10)
+        )
+
+        imagenes_box = toga.Box(
+            children=[self.image_view_original, self.image_view_procesada],  # Mostrar ambas imágenes
+            style=Pack(direction=ROW, padding=10)
+        )
+
+        main_box = toga.Box(
+            children=[botones_box, sliders_box, imagenes_box],
             style=Pack(direction=COLUMN, padding=10)
         )
         
-        self.main_window.content = box
+        self.main_window.content = main_box
         self.main_window.show()
 
     async def cargar_imagen(self, widget):
@@ -56,10 +69,17 @@ class AnalisisEnfermedadCebada(toga.App):
 
     def mostrar_imagen(self, file_path):
         try:
+            # Cargar y mostrar la imagen original
             self.pil_image = PILImage.open(file_path)
-            self.pil_image.thumbnail((500, 500))  # Redimensionar
+            self.pil_image.thumbnail((400, 400))  # Redimensionar
             self.original_array = np.array(self.pil_image)
-            
+
+            # Mostrar la imagen original en el nuevo ImageView
+            with io.BytesIO() as f:
+                self.pil_image.save(f, format='PNG')
+                self.image_view_original.image = toga.Image(f.getvalue())
+
+            # Aplicar la segmentación y actualizar la imagen procesada
             self.actualizar_umbral_b(self.slider_umbral_b)
             
         except Exception as e:
@@ -102,13 +122,14 @@ class AnalisisEnfermedadCebada(toga.App):
             self.severidad = (area_enferma / area_total_hojas) * 100 if area_total_hojas > 0 else 0
             self.label_severidad.text = f'Severidad: {self.severidad:.2f}%'
 
+            # Mostrar imagen procesada
             self.mostrar_imagen_procesada(img_resultado)
 
     def mostrar_imagen_procesada(self, imagen):
         imagen_pil = PILImage.fromarray(imagen)
         with io.BytesIO() as f:
             imagen_pil.save(f, format='PNG')
-            self.image_view.image = toga.Image(f.getvalue())
+            self.image_view_procesada.image = toga.Image(f.getvalue())  # Cambiado para la vista procesada
         self.imagen_procesada = imagen_pil
 
     async def guardar_imagen(self, widget):
